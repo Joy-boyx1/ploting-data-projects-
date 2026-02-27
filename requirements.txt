@@ -1,13 +1,5 @@
 streamlit
 pandas
-numpy
-openpyxl
-sentence-transformers
-scikit-learn
-torch
-transformers
-huggingface-hub
-sentence-transformers
 matplotlib
 seaborn
-plotly
+openpyxl
