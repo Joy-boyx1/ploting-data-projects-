@@ -19,7 +19,7 @@ if uploaded_file_aznag:
         df_aznag = pd.read_excel(uploaded_file_aznag, engine='openpyxl')
         
         # Définition des colonnes
-        col_exercice = df_aznag.columns[0] # Colonne A (Index 0)
+        col_exercice = df_aznag.columns[0] # Colonne A
         col_etat = "Etat"
         col_titre = df_aznag.columns[6]   # Colonne G
         col_budget = df_aznag.columns[9]  # Colonne J
@@ -29,21 +29,16 @@ if uploaded_file_aznag:
         df_aznag = df_aznag.dropna(how='all')
 
         # --- SECTION FILTRE PAR EXERCICE ---
-        st.write("---")
-        # Extraction des années uniques de la colonne A
         exercices_disponibles = sorted(df_aznag[col_exercice].dropna().unique().astype(str), reverse=True)
         options_filtre = ["Tous"] + exercices_disponibles
-        
-        # Affichage du filtre sous forme de selectbox ou radio horizontal
         selected_year = st.selectbox("📅 Sélectionner l'EXERCICE (Colonne A) :", options=options_filtre)
 
-        # Application du filtre
         if selected_year != "Tous":
             df_filtered = df_aznag[df_aznag[col_exercice].astype(str) == selected_year]
         else:
             df_filtered = df_aznag
 
-        # 2. Affichage du tableau (Données filtrées)
+        # 2. Affichage du tableau de données
         st.write(f"### 📋 Données : {selected_year}")
         st.dataframe(df_filtered, use_container_width=True)
 
@@ -63,7 +58,7 @@ if uploaded_file_aznag:
                 st.session_state.show_budget = not st.session_state.show_budget
 
         # ---------------------------------------------------------
-        # 3. ANALYSE : ETAT (Sur données filtrées)
+        # 3. ANALYSE : ETAT (Montants en chiffres uniquement)
         # ---------------------------------------------------------
         if st.session_state.show_etat:
             if col_etat in df_filtered.columns:
@@ -73,10 +68,15 @@ if uploaded_file_aznag:
                 counts = df_clean_etat[col_etat].value_counts()
                 percentages = (df_clean_etat[col_etat].value_counts(normalize=True) * 100)
                 
-                df_stats = pd.DataFrame({"Nombre": counts, "Pourcentage (%)": percentages.map("{:.2f}%".format)})
+                # ICI : On garde uniquement les chiffres arrondis
+                df_stats = pd.DataFrame({
+                    "Nombre": counts, 
+                    "Pourcentage": percentages.round(2)  # Juste le chiffre
+                })
                 
                 c1, c2 = st.columns([1, 2])
-                with c1: st.dataframe(df_stats, use_container_width=True)
+                with c1: 
+                    st.dataframe(df_stats, use_container_width=True)
                 with c2:
                     fig, ax = plt.subplots(figsize=(10, 4))
                     sns.countplot(data=df_clean_etat, x=col_etat, palette="viridis", order=counts.index, ax=ax)
@@ -84,18 +84,16 @@ if uploaded_file_aznag:
                     st.pyplot(fig)
 
         # ---------------------------------------------------------
-        # 4. ANALYSE : ECART BUDGÉTAIRE (Sur données filtrées)
+        # 4. ANALYSE : ECART BUDGÉTAIRE
         # ---------------------------------------------------------
         if st.session_state.show_budget:
             st.write("---")
             st.write(f"### 💰 Budget vs Adjugé ({selected_year})")
             
-            # Conversion numérique
             df_fin = df_filtered.copy()
             df_fin[col_budget] = pd.to_numeric(df_fin[col_budget], errors='coerce').fillna(0)
             df_fin[col_adjuge] = pd.to_numeric(df_fin[col_adjuge], errors='coerce').fillna(0)
             
-            # Filtrage des lignes avec montants
             df_plot_data = df_fin[(df_fin[col_budget] > 0) | (df_fin[col_adjuge] > 0)].head(20)
 
             if not df_plot_data.empty:
@@ -110,11 +108,12 @@ if uploaded_file_aznag:
                 plt.xticks(rotation=45, ha='right')
                 st.pyplot(fig2)
                 
-                df_plot_data['Écart'] = df_plot_data[col_budget] - df_plot_data[col_adjuge]
-                st.write("**Détails des calculs :**")
+                # Écart en chiffres
+                df_plot_data['Écart'] = (df_plot_data[col_budget] - df_plot_data[col_adjuge]).round(2)
+                st.write("**Détails des montants (chiffres) :**")
                 st.dataframe(df_plot_data[[col_titre, col_budget, col_adjuge, 'Écart']], use_container_width=True)
             else:
-                st.warning(f"Aucune donnée budgétaire disponible pour l'exercice : {selected_year}")
+                st.warning("Aucune donnée budgétaire disponible.")
 
     except Exception as e:
         st.error(f"❌ Erreur : {e}")
