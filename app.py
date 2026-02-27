@@ -12,58 +12,60 @@ uploaded_file_aznag = st.file_uploader(
 )
 
 if uploaded_file_aznag:
-    # Vérification du nom du fichier (optionnel mais recommandé)
     if "SUIVI AFFAIRES GLOBALE - AZNAG" in uploaded_file_aznag.name:
         try:
             # 2. Lecture du fichier
             df_aznag = pd.read_excel(uploaded_file_aznag, engine='openpyxl')
             
-            # Affichage de l'aperçu
-            st.write("### Aperçu des données")
-            st.dataframe(df_aznag.head(), use_container_width=True)
+            # Affichage de l'ENSEMBLE des données
+            st.write("### Données complètes")
+            st.dataframe(df_aznag, use_container_width=True)
 
-            # 3. Vérification de la colonne 'ETAT'
-            if "ETAT" in df_aznag.columns:
-                st.write("### Répartition par État")
+            # 3. Vérification de la colonne 'Etat' (Correction du nom)
+            column_name = "Etat" 
+            
+            if column_name in df_aznag.columns:
+                st.write("---")
+                st.write("### 📈 Répartition par État")
                 
-                # Calcul des statistiques (Nombre et Pourcentage)
-                counts = df_aznag["ETAT"].value_counts()
-                percentages = df_aznag["ETAT"].value_counts(normalize=True) * 100
+                # Calcul des statistiques
+                counts = df_aznag[column_name].value_counts()
+                percentages = df_aznag[column_name].value_counts(normalize=True) * 100
                 
                 # Création du tableau récapitulatif
                 df_stats_etat = pd.DataFrame({
                     "Nombre": counts,
-                    "Pourcentage (%)": percentages.round(2)
+                    "Pourcentage (%)": percentages.map("{:.2f}%".format) # Formatage propre
                 })
                 
-                # Affichage du tableau
+                # Affichage côte à côte
                 col1, col2 = st.columns([1, 2])
+                
                 with col1:
+                    st.write("**Statistiques détaillées**")
                     st.table(df_stats_etat)
 
-                # 4. Visualisation avec Seaborn / Matplotlib
                 with col2:
+                    # 4. Visualisation
                     fig, ax = plt.subplots(figsize=(10, 6))
                     sns.countplot(
                         data=df_aznag, 
-                        x="ETAT", 
+                        x=column_name, 
                         palette="viridis", 
                         order=counts.index,
                         ax=ax
                     )
                     
-                    # Ajout des labels
-                    plt.title("Répartition des Affaires par État", fontsize=14)
+                    plt.title(f"Répartition des Affaires par {column_name}", fontsize=14)
                     plt.xlabel("État", fontsize=12)
                     plt.ylabel("Nombre d'affaires", fontsize=12)
                     plt.xticks(rotation=45)
                     
-                    # Affichage du graphique
                     st.pyplot(fig)
             else:
-                st.error("❌ La colonne 'ETAT' est introuvable dans le fichier.")
+                st.error(f"❌ La colonne '{column_name}' est introuvable. Colonnes détectées : {list(df_aznag.columns)}")
                 
         except Exception as e:
             st.error(f"❌ Erreur lors de la lecture : {e}")
     else:
-        st.warning("⚠️ Le fichier importé ne semble pas être le bon (Nom attendu : SUIVI AFFAIRES GLOBALE - AZNAG)")
+        st.warning("⚠️ Nom de fichier incorrect.")
