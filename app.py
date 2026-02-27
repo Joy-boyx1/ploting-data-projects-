@@ -37,7 +37,6 @@ if uploaded_file:
         col_budget   = df_aznag.columns[9]
         col_adjuge   = df_aznag.columns[13]
 
-        # --- CORRECTION DE L'ERREUR 'Series' object has no attribute 'lower' ---
         # Nettoyage des lignes vides ou contenant le texte "None"
         df_aznag = df_aznag[df_aznag[col_exercice].astype(str).str.strip() != ""]
         df_aznag = df_aznag[df_aznag[col_exercice].astype(str).str.lower() != "none"]
@@ -54,17 +53,55 @@ if uploaded_file:
         st.write("### Données complètes")
         st.dataframe(df_filtered, use_container_width=True)
 
-        # --- ETATS DES BOUTONS ---
+        # --- ÉTATS DES BOUTONS (SESSION STATE) ---
+        if 'show_etat' not in st.session_state: st.session_state.show_etat = False
         if 'show_budget' not in st.session_state: st.session_state.show_budget = False
         
-        if st.button("Ecart budgétaire"):
-            st.session_state.show_budget = not st.session_state.show_budget
+        col_btn1, col_btn2, _ = st.columns([1, 1, 4])
+        
+        with col_btn1:
+            if st.button("Etat"):
+                st.session_state.show_etat = not st.session_state.show_etat
+        
+        with col_btn2:
+            if st.button("Ecart budgétaire"):
+                st.session_state.show_budget = not st.session_state.show_budget
 
-        # --- BLOC ÉCART BUDGÉTAIRE ---
+        # ---------------------------------------------------------
+        # 1. BLOC ANALYSE : ETAT
+        # ---------------------------------------------------------
+        if st.session_state.show_etat:
+            st.write("---")
+            st.write(f"### 📈 Répartition par Etat ({selected_year})")
+            
+            df_clean_etat = df_filtered.dropna(subset=[col_etat])
+            # On s'assure que "None" n'apparaît pas dans les statistiques
+            df_clean_etat = df_clean_etat[df_clean_etat[col_etat].astype(str).str.lower() != "none"]
+            
+            counts = df_clean_etat[col_etat].value_counts()
+            df_stats = pd.DataFrame({
+                "Nombre": counts, 
+                "Pourcentage": (counts / counts.sum() * 100).round(2)
+            })
+            
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.dataframe(df_stats, use_container_width=True)
+            with c2:
+                fig1, ax1 = plt.subplots(figsize=(10, 4))
+                sns.countplot(data=df_clean_etat, x=col_etat, palette="viridis", order=counts.index, ax=ax1)
+                plt.xticks(rotation=45)
+                st.pyplot(fig1)
+
+        # ---------------------------------------------------------
+        # 2. BLOC ANALYSE : ECART BUDGÉTAIRE
+        # ---------------------------------------------------------
         if st.session_state.show_budget:
             st.write("---")
+            st.write("### 💰 Comparaison Budget vs Adjugé")
+            
             # Extraction des sites incluant "NA"
-            sites = sorted([str(s) for s in df_filtered[col_sites].unique() if str(s).strip() != ""])
+            sites = sorted([str(s) for s in df_filtered[col_sites].unique() if str(s).strip() != "" and str(s).lower() != "none"])
             selected_site = st.selectbox("📍 Filtrer par Site :", options=["Tous les sites"] + sites)
             
             df_b = df_filtered.copy()
@@ -77,12 +114,12 @@ if uploaded_file:
             if not df_plot.empty:
                 # Graphique
                 df_melt = df_plot.melt(id_vars=[col_titre], value_vars=[col_budget, col_adjuge], var_name='Type', value_name='Montant')
-                fig, ax = plt.subplots(figsize=(16, 7))
-                barplot = sns.barplot(data=df_melt, x=col_titre, y='Montant', hue='Type', ax=ax, palette=["#3498db", "#e67e22"])
+                fig2, ax2 = plt.subplots(figsize=(16, 7))
+                barplot = sns.barplot(data=df_melt, x=col_titre, y='Montant', hue='Type', ax=ax2, palette=["#3498db", "#e67e22"])
                 
                 # Echelle 500 000
-                ax.yaxis.set_major_locator(ticker.MultipleLocator(500000))
-                ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+                ax2.yaxis.set_major_locator(ticker.MultipleLocator(500000))
+                ax2.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
                 
                 # Annotations sur les barres (Montants)
                 for p in barplot.patches:
@@ -92,12 +129,12 @@ if uploaded_file:
                                        ha='center', va='center', xytext=(0, 9), textcoords='offset points', fontsize=8, fontweight='bold')
 
                 plt.xticks(rotation=45, ha='right')
-                st.pyplot(fig)
+                plt.grid(axis='y', linestyle='--', alpha=0.3)
+                st.pyplot(fig2)
                 
-                # Indicateur % d'écart : (Adjugé / Budget) * 100
+                # Calcul % d'écart
                 df_plot['% d’Écart'] = ((df_plot[col_adjuge] / df_plot[col_budget]) * 100).round(2)
                 st.write(f"**Analyse détaillée - Site : {selected_site}**")
-                # Affichage des montants en chiffres uniquement
                 st.dataframe(df_plot[[col_titre, col_budget, col_adjuge, '% d’Écart']], use_container_width=True)
             else:
                 st.warning("⚠️ Aucune donnée budgétaire complète pour cette sélection.")
