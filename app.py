@@ -7,7 +7,7 @@ import seaborn as sns
 # Configuration large
 st.set_page_config(layout="wide", page_title="Dashboard AZNAG")
 
-st.title("📊 Analyse du Suivi des Affaires - AZNAG")
+st.title("📊 Suivi des Affaires")
 
 # --- FONCTION DE NETTOYAGE DES MONTANTS ---
 def clean_financial_value(value):
