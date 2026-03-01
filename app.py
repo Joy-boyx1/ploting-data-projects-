@@ -35,7 +35,7 @@ if uploaded_file:
         col_budget   = df_aznag.columns[9]
         col_adjuge   = df_aznag.columns[13]
 
-        # Nettoyage initial
+        # Nettoyage initial des montants
         df_aznag[col_budget] = df_aznag[col_budget].apply(clean_financial_value)
         df_aznag[col_adjuge] = df_aznag[col_adjuge].apply(clean_financial_value)
 
@@ -44,7 +44,7 @@ if uploaded_file:
         selected_year = st.selectbox("📅 Exercice :", options=["Tous"] + exercices)
         df_filtered = df_aznag if selected_year == "Tous" else df_aznag[df_aznag[col_exercice].astype(str) == selected_year]
 
-        # --- SESSION STATE ---
+        # --- SESSION STATE POUR BOUTONS ---
         if 'show_etat' not in st.session_state: st.session_state.show_etat = False
         if 'show_budget' not in st.session_state: st.session_state.show_budget = False
         if 'show_site_analysis' not in st.session_state: st.session_state.show_site_analysis = False
@@ -64,12 +64,12 @@ if uploaded_file:
             counts = df_clean_etat[col_etat].value_counts()
             st.bar_chart(counts)
 
-        # 2. BLOC ECART BUDGÉTAIRE (FILTRAGE STRICT DES AFFAIRES)
+        # 2. BLOC ECART BUDGÉTAIRE (AVEC VALEURS AFFICHÉES)
         if st.session_state.show_budget:
             st.write("---")
-            st.write("### 💸 Comparaison Budget vs Adjugé (Affaires complètes uniquement)")
+            st.write("### 💸 Comparaison Budget vs Adjugé (Affaires complètes)")
             
-            # Suppression des lignes où l'un des deux montants est 0 ou vide
+            # Filtre strict : on élimine l'intitulé si une valeur est à 0
             df_strict = df_filtered[(df_filtered[col_budget] > 0) & (df_filtered[col_adjuge] > 0)]
             
             sites = sorted([str(s) for s in df_strict[col_sites].unique()])
@@ -80,39 +80,56 @@ if uploaded_file:
                 df_plot = df_plot[df_plot[col_sites].astype(str) == selected_site]
 
             if not df_plot.empty:
-                # On ne prend que les 15 premières affaires valides
                 df_plot = df_plot.head(15)
                 df_melt = df_plot.melt(id_vars=[col_titre], value_vars=[col_budget, col_adjuge], var_name='Type', value_name='Montant')
                 
-                fig2, ax2 = plt.subplots(figsize=(16, 7))
-                sns.barplot(data=df_melt, x=col_titre, y='Montant', hue='Type', ax=ax2, palette=["#3498db", "#e67e22"])
+                fig2, ax2 = plt.subplots(figsize=(16, 8))
+                barplot2 = sns.barplot(data=df_melt, x=col_titre, y='Montant', hue='Type', ax=ax2, palette=["#3498db", "#e67e22"])
+                
+                # --- AFFICHAGE DES VALEURS SUR LES BARRES ---
+                for p in barplot2.patches:
+                    if p.get_height() > 0:
+                        barplot2.annotate(format(int(p.get_height()), ','), 
+                                         (p.get_x() + p.get_width() / 2., p.get_height()), 
+                                         ha='center', va='center', xytext=(0, 10), 
+                                         textcoords='offset points', fontsize=8, fontweight='bold')
+
                 ax2.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
                 plt.xticks(rotation=45, ha='right')
+                plt.ylim(0, df_plot[[col_budget, col_adjuge]].max().max() * 1.15) # Marge pour les étiquettes
                 st.pyplot(fig2)
             else:
-                st.warning("⚠️ Aucune affaire n'a les deux montants renseignés pour cette sélection.")
+                st.warning("⚠️ Aucune affaire complète à afficher.")
 
-        # 3. BLOC ETAT PAR SITE (FILTRAGE STRICT DES SITES)
+        # 3. BLOC ETAT PAR SITE (AVEC VALEURS AFFICHÉES)
         if st.session_state.show_site_analysis:
             st.write("---")
-            st.write("### 🏢 Analyse Cumulative par Site (Sites complets uniquement)")
+            st.write("### 🏢 Analyse Cumulative par Site")
 
-            # Filtrage avant groupement : on ignore les lignes incomplètes
             df_site_strict = df_filtered[(df_filtered[col_budget] > 0) & (df_filtered[col_adjuge] > 0)]
-            
             df_site_group = df_site_strict.groupby(col_sites)[[col_budget, col_adjuge]].sum().reset_index()
 
             if not df_site_group.empty:
                 df_site_melt = df_site_group.melt(id_vars=[col_sites], value_vars=[col_budget, col_adjuge], var_name='Type', value_name='Montant Total')
                 
-                fig3, ax3 = plt.subplots(figsize=(14, 6))
-                sns.barplot(data=df_site_melt, x=col_sites, y='Montant Total', hue='Type', ax=ax3, palette=["#3498db", "#e67e22"])
+                fig3, ax3 = plt.subplots(figsize=(14, 7))
+                barplot3 = sns.barplot(data=df_site_melt, x=col_sites, y='Montant Total', hue='Type', ax=ax3, palette=["#3498db", "#e67e22"])
+                
+                # --- AFFICHAGE DES VALEURS SUR LES BARRES ---
+                for p in barplot3.patches:
+                    if p.get_height() > 0:
+                        barplot3.annotate(format(int(p.get_height()), ','), 
+                                         (p.get_x() + p.get_width() / 2., p.get_height()), 
+                                         ha='center', va='center', xytext=(0, 10), 
+                                         textcoords='offset points', fontsize=9, fontweight='bold')
+
                 ax3.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
                 plt.xticks(rotation=45)
+                plt.ylim(0, df_site_group[[col_budget, col_adjuge]].max().max() * 1.15)
                 st.pyplot(fig3)
                 st.dataframe(df_site_group, use_container_width=True)
             else:
-                st.info("ℹ️ Aucun site n'a de données complètes à afficher.")
+                st.info("ℹ️ Données incomplètes pour l'analyse par site.")
 
     except Exception as e:
         st.error(f"❌ Erreur : {e}")
