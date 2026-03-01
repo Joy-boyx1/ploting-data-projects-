@@ -27,7 +27,7 @@ if uploaded_file:
     try:
         df_aznag = pd.read_excel(uploaded_file, engine='openpyxl', keep_default_na=False)
         
-        # Mapping des colonnes (A=0, C=2, G=6, J=9, N=13)
+        # Mapping des colonnes
         col_exercice = df_aznag.columns[0]
         col_sites    = df_aznag.columns[2]
         col_etat     = "Etat" 
@@ -57,34 +57,30 @@ if uploaded_file:
         with col_btn3:
             if st.button("🏢 Etat par Site"): st.session_state.show_site_analysis = not st.session_state.show_site_analysis
 
-        # 1. BLOC ETAT (TRIÉ PAR FRÉQUENCE + COULEURS DIFFÉRENTES)
+        # 1. BLOC ETAT (TRIÉ + DÉGRADÉ ORANGE)
         if st.session_state.show_etat:
             st.write("---")
-            st.write(f"### 📈 Répartition par Etat (Du plus au moins fréquent)")
+            st.write(f"### 📈 Répartition par Etat (Ordre décroissant)")
             
-            # Nettoyage et comptage
             df_clean_etat = df_filtered[df_filtered[col_etat].astype(str).str.lower() != "none"]
             counts = df_clean_etat[col_etat].value_counts().reset_index()
             counts.columns = [col_etat, 'Nombre']
             
             if not counts.empty:
                 fig1, ax1 = plt.subplots(figsize=(12, 5))
-                # Palette "husl" pour avoir des couleurs bien distinctes
-                barplot1 = sns.barplot(data=counts, x=col_etat, y='Nombre', palette="husl", ax=ax1)
+                # Utilisation de la palette "Oranges_r" (r pour reverse, du plus foncé au plus clair)
+                barplot1 = sns.barplot(data=counts, x=col_etat, y='Nombre', palette="Oranges_r", ax=ax1)
                 
-                # Ajout des valeurs sur les barres
                 for p in barplot1.patches:
                     ax1.annotate(format(int(p.get_height()), 'd'), 
                                 (p.get_x() + p.get_width() / 2., p.get_height()), 
                                 ha='center', va='center', xytext=(0, 9), 
-                                textcoords='offset points', fontweight='bold')
+                                textcoords='offset points', fontweight='bold', color="#444444")
                 
                 plt.xticks(rotation=45)
                 plt.ylabel("Nombre d'affaires")
                 st.pyplot(fig1)
                 st.dataframe(counts, use_container_width=True)
-            else:
-                st.warning("Aucune donnée d'état disponible.")
 
         # 2. BLOC ECART BUDGÉTAIRE
         if st.session_state.show_budget:
