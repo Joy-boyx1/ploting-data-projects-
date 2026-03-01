@@ -32,7 +32,7 @@ if uploaded_file:
         # Mapping des colonnes (A=0, C=2, G=6, J=9, N=13)
         col_exercice = df_aznag.columns[0]
         col_sites    = df_aznag.columns[2]
-        col_etat     = "Etat" # Assurez-vous que cette colonne existe textuellement ou via index
+        col_etat     = "Etat" 
         col_titre    = df_aznag.columns[6]
         col_budget   = df_aznag.columns[9]
         col_adjuge   = df_aznag.columns[13]
@@ -58,7 +58,6 @@ if uploaded_file:
         if 'show_budget' not in st.session_state: st.session_state.show_budget = False
         if 'show_site_analysis' not in st.session_state: st.session_state.show_site_analysis = False
         
-        # Barre de navigation par boutons
         col_btn1, col_btn2, col_btn3, _ = st.columns([1, 1.5, 1.5, 3])
         
         with col_btn1:
@@ -74,7 +73,7 @@ if uploaded_file:
                 st.session_state.show_site_analysis = not st.session_state.show_site_analysis
 
         # ---------------------------------------------------------
-        # 1. BLOC ANALYSE : ETAT (Répartition par statut)
+        # 1. BLOC ANALYSE : ETAT
         # ---------------------------------------------------------
         if st.session_state.show_etat:
             st.write("---")
@@ -98,18 +97,16 @@ if uploaded_file:
                     sns.countplot(data=df_clean_etat, x=col_etat, palette="viridis", order=counts.index, ax=ax1)
                     plt.xticks(rotation=45)
                     st.pyplot(fig1)
-            else:
-                st.error(f"La colonne '{col_etat}' est introuvable.")
 
         # ---------------------------------------------------------
-        # 2. BLOC ANALYSE : ECART BUDGÉTAIRE (Par Affaire)
+        # 2. BLOC ANALYSE : ECART BUDGÉTAIRE
         # ---------------------------------------------------------
         if st.session_state.show_budget:
             st.write("---")
             st.write("### 💸 Comparaison Budget vs Adjugé (Par Affaire)")
             
             sites = sorted([str(s) for s in df_filtered[col_sites].unique() if str(s).strip() != "" and str(s).lower() != "none"])
-            selected_site = st.selectbox("📍 Filtrer par Site pour l'analyse détaillée :", options=["Tous les sites"] + sites)
+            selected_site = st.selectbox("📍 Filtrer par Site :", options=["Tous les sites"] + sites)
             
             df_b = df_filtered.copy()
             if selected_site != "Tous les sites":
@@ -120,6 +117,7 @@ if uploaded_file:
             if not df_plot.empty:
                 df_melt = df_plot.melt(id_vars=[col_titre], value_vars=[col_budget, col_adjuge], var_name='Type', value_name='Montant')
                 fig2, ax2 = plt.subplots(figsize=(16, 7))
+                # Utilisation des couleurs demandées
                 barplot = sns.barplot(data=df_melt, x=col_titre, y='Montant', hue='Type', ax=ax2, palette=["#3498db", "#e67e22"])
                 
                 ax2.yaxis.set_major_locator(ticker.MaxNLocator(nbins=10))
@@ -132,39 +130,30 @@ if uploaded_file:
                                        ha='center', va='center', xytext=(0, 9), textcoords='offset points', fontsize=8, fontweight='bold')
 
                 plt.xticks(rotation=45, ha='right')
-                plt.grid(axis='y', linestyle='--', alpha=0.3)
                 st.pyplot(fig2)
-                
-                df_plot['% d’Écart'] = ((df_plot[col_adjuge] / df_plot[col_budget]) * 100).round(2)
-                st.dataframe(df_plot[[col_titre, col_budget, col_adjuge, '% d’Écart']], use_container_width=True)
             else:
-                st.warning("⚠️ Aucune donnée budgétaire pour cette sélection.")
+                st.warning("⚠️ Aucune donnée financière pour cette sélection.")
 
         # ---------------------------------------------------------
-        # 3. BLOC ANALYSE : ETAT PAR SITE (Histogramme cumulé)
+        # 3. BLOC ANALYSE : ETAT PAR SITE (Mêmes couleurs)
         # ---------------------------------------------------------
         if st.session_state.show_site_analysis:
             st.write("---")
-            st.write("### 🏢 Analyse Cumulative par Site (Budget vs Adjugé)")
+            st.write("### 🏢 Analyse Cumulative par Site")
 
-            # Groupement par Site (Colonne C) et Somme (Colonnes J et N)
             df_site_group = df_filtered.groupby(col_sites)[[col_budget, col_adjuge]].sum().reset_index()
-            
-            # On retire les lignes sans montants pour la clarté du graph
             df_site_group = df_site_group[(df_site_group[col_budget] > 0) | (df_site_group[col_adjuge] > 0)]
 
             if not df_site_group.empty:
-                # Format long pour Seaborn
                 df_site_melt = df_site_group.melt(id_vars=[col_sites], value_vars=[col_budget, col_adjuge], 
                                                 var_name='Type', value_name='Montant Total')
                 
                 fig3, ax3 = plt.subplots(figsize=(14, 6))
-                barplot3 = sns.barplot(data=df_site_melt, x=col_sites, y='Montant Total', hue='Type', ax=ax3, palette=["#2ecc71", "#e74c3c"])
+                # MAINTIEN DES MÊMES COULEURS ICI : Bleu (#3498db) et Orange (#e67e22)
+                barplot3 = sns.barplot(data=df_site_melt, x=col_sites, y='Montant Total', hue='Type', ax=ax3, palette=["#3498db", "#e67e22"])
                 
-                # Formatage monétaire
                 ax3.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
                 
-                # Annotations sur les barres
                 for p in barplot3.patches:
                     if p.get_height() > 0:
                         ax3.annotate(format(int(p.get_height()), ','), 
@@ -173,15 +162,10 @@ if uploaded_file:
                                     textcoords='offset points', fontsize=9, fontweight='bold')
 
                 plt.xticks(rotation=45)
-                plt.title("Récapitulatif Global par Site")
                 st.pyplot(fig3)
-                
-                # Calcul de la performance par site
-                df_site_group['Consommation %'] = ((df_site_group[col_adjuge] / df_site_group[col_budget]) * 100).round(2)
-                st.dataframe(df_site_group.sort_values(by=col_budget, ascending=False), use_container_width=True)
+                st.dataframe(df_site_group, use_container_width=True)
             else:
-                st.info("ℹ️ Aucune donnée financière disponible pour les sites.")
+                st.info("ℹ️ Aucune donnée disponible pour les sites.")
 
     except Exception as e:
-        st.error(f"❌ Erreur lors du traitement : {e}")
-        st.exception(e) # Pour le debug
+        st.error(f"❌ Erreur : {e}")
